@@ -1,0 +1,263 @@
+DEFINE
+
+MEASURE 'Clickstream'[Sessions] =
+    DISTINCTCOUNT('Clickstream'[SessionID])
+
+MEASURE 'Clickstream'[Users] =
+    DISTINCTCOUNT('Clickstream'[UserID])
+
+MEASURE 'Clickstream'[Events] =
+    COUNTROWS('Clickstream')
+
+
+MEASURE 'Clickstream'[Homepage Sessions] =
+CALCULATE(
+    DISTINCTCOUNT(Clickstream[SessionID]),
+    KEEPFILTERS(Clickstream[EventStep] = "Homepage")
+)
+
+MEASURE 'Clickstream'[Product Page Sessions]=
+VAR ProductSessions =
+    CALCULATETABLE(
+        VALUES(Clickstream[SessionID]),
+        Clickstream[EventStep] = "Product Page"
+    )
+VAR HomepageSessions =
+    CALCULATETABLE(
+        VALUES(Clickstream[SessionID]),
+        Clickstream[EventStep] = "Homepage"
+    )
+RETURN
+COUNTROWS(
+    INTERSECT(ProductSessions, HomepageSessions)
+)
+
+MEASURE 'Clickstream'[Add To Cart Sessions]=
+VAR CartSessions =
+    CALCULATETABLE(
+        VALUES(Clickstream[SessionID]),
+        Clickstream[EventStep] = "Add to Cart"
+    )
+VAR ProductSessions =
+    CALCULATETABLE(
+        VALUES(Clickstream[SessionID]),
+        Clickstream[EventStep] = "Product Page"
+    )
+RETURN
+COUNTROWS(
+    INTERSECT(CartSessions, ProductSessions)
+)
+
+MEASURE 'Clickstream'[Checkout Start Sessions]=
+VAR CheckoutSessions =
+    CALCULATETABLE(
+        VALUES(Clickstream[SessionID]),
+        Clickstream[EventStep] = "Checkout Start"
+    )
+VAR CartSessions =
+    CALCULATETABLE(
+        VALUES(Clickstream[SessionID]),
+        Clickstream[EventStep] = "Add to Cart"
+    )
+RETURN
+COUNTROWS(
+    INTERSECT(CheckoutSessions, CartSessions)
+)
+
+MEASURE 'Clickstream'[Purchase Sessions]=
+VAR PurchaseSessions =
+    CALCULATETABLE(
+        VALUES(Clickstream[SessionID]),
+        Clickstream[Purchased] = 1
+    )
+VAR CheckoutSessions =
+    CALCULATETABLE(
+        VALUES(Clickstream[SessionID]),
+        Clickstream[EventStep] = "Checkout Start"
+    )
+RETURN
+COUNTROWS(
+    INTERSECT(PurchaseSessions, CheckoutSessions)
+)
+
+
+MEASURE 'Clickstream'[Conversion Rate %] =
+    DIVIDE([Purchase Sessions], [Sessions], 0)
+
+MEASURE 'Clickstream'[Product → Cart Conversion %] =
+    DIVIDE([Add To Cart Sessions], [Product Page Sessions], 0)
+
+MEASURE 'Clickstream'[Cart → Checkout Conversion %] =
+    DIVIDE([Checkout Start Sessions], [Add To Cart Sessions], 0)
+
+MEASURE 'Clickstream'[Checkout → Purchase Conversion %] =
+    DIVIDE([Purchase Sessions], [Checkout Start Sessions], 0)
+
+MEASURE 'Clickstream'[Dropoff Homepage → Product %] =
+    1 - DIVIDE([Product Page Sessions], [Homepage Sessions], 0)
+
+MEASURE 'Clickstream'[Dropoff Product → Cart %] =
+    1 - DIVIDE([Add To Cart Sessions], [Product Page Sessions], 0)
+
+MEASURE 'Clickstream'[Dropoff Cart → Checkout %] =
+    1 - DIVIDE([Checkout Start Sessions], [Add To Cart Sessions], 0)
+
+MEASURE 'Clickstream'[Dropoff Checkout → Purchase %] =
+    1 - DIVIDE([Purchase Sessions], [Checkout Start Sessions], 0)
+
+MEASURE 'Clickstream'[Cart Abandonment Rate %] =
+    1 - DIVIDE([Purchase Sessions], [Add To Cart Sessions], 0)
+
+MEASURE 'Clickstream'[Checkout Abandonment Rate %] =
+    1 - DIVIDE([Purchase Sessions], [Checkout Start Sessions], 0)
+
+
+MEASURE 'Clickstream'[Orders] =
+    CALCULATE(
+        DISTINCTCOUNT('Clickstream'[SessionID]),
+        'Clickstream'[Purchased] = 1
+    )
+
+MEASURE 'Clickstream'[Total Revenue] =
+    SUM('Clickstream'[OrderValue])
+
+MEASURE 'Clickstream'[AOV] =
+    DIVIDE([Total Revenue], [Orders], 0)
+
+MEASURE 'Clickstream'[Items Purchased] =
+    SUM('Clickstream'[Purchased])
+
+
+MEASURE 'Clickstream'[Sessions by Traffic Source] =
+    [Sessions]
+
+MEASURE 'Clickstream'[Conversion Rate by Traffic Source] =
+    DIVIDE([Purchase Sessions], [Sessions], 0)
+
+MEASURE 'Clickstream'[Revenue by Traffic Source] =
+    CALCULATE([Total Revenue], ALLEXCEPT('Clickstream', 'Clickstream'[TrafficSource]))
+
+MEASURE 'Clickstream'[Sessions by Device] =
+    [Sessions]
+
+MEASURE 'Clickstream'[Conversion Rate by Device] =
+    DIVIDE([Purchase Sessions], [Sessions], 0)
+
+MEASURE 'Clickstream'[Sessions by Browser] =
+    [Sessions]
+
+MEASURE 'Clickstream'[Conversion Rate by Browser] =
+    DIVIDE([Purchase Sessions], [Sessions], 0)
+
+MEASURE 'Clickstream'[Top Viewed Products] =
+    DISTINCTCOUNT('Clickstream'[ProductID])
+
+MEASURE 'Clickstream'[Conversion Rate by Category] =
+    DIVIDE(
+        CALCULATE([Purchase Sessions], ALLSELECTED('Clickstream'[Category])),
+        CALCULATE([Sessions], ALLSELECTED('Clickstream'[Category])),
+        0
+    )
+
+MEASURE 'Clickstream'[Revenue by Category] =
+    CALCULATE([Total Revenue], ALLEXCEPT('Clickstream', 'Clickstream'[Category]))
+
+MEASURE 'Clickstream'[Sessions (Last 7 Days)] =
+    CALCULATE(
+        [Sessions],
+        FILTER(
+            ALL('Clickstream'[EventTimestamp]),
+            'Clickstream'[EventTimestamp] >= MAX('Clickstream'[EventTimestamp]) - 6
+        )
+    )
+
+MEASURE 'Clickstream'[Revenue (Last 30 Days)] =
+    CALCULATE(
+        [Total Revenue],
+        FILTER(
+            ALL('Clickstream'[EventTimestamp]),
+            'Clickstream'[EventTimestamp] >= MAX('Clickstream'[EventTimestamp]) - 29
+        )
+    )
+
+MEASURE 'Clickstream'[Avg Events per Session] =
+    DIVIDE([Events], [Sessions], 0)
+
+MEASURE 'Clickstream'[Avg Price Viewed] =
+    AVERAGE('Clickstream'[Price])
+
+MEASURE 'Clickstream'[Last Event Timestamp (per session)] =
+    CALCULATE(
+        MAX('Clickstream'[EventTimestamp]),
+        ALLEXCEPT('Clickstream', 'Clickstream'[SessionID])
+    )
+
+MEASURE 'Clickstream'[Sessions Abandoned (No Purchase)] =
+    CALCULATE(
+        DISTINCTCOUNT('Clickstream'[SessionID]),
+        'Clickstream'[Purchased] = 0
+    )
+
+MEASURE 'Clickstream'[Total Campaign Cost] =
+    0
+
+MEASURE 'Clickstream'[CPA] =
+    DIVIDE([Total Campaign Cost], [Orders], BLANK())
+
+MEASURE 'Clickstream'[Sessions Missing UserID] =
+    CALCULATE(
+        DISTINCTCOUNT('Clickstream'[SessionID]),
+        ISBLANK('Clickstream'[UserID])
+    )
+
+MEASURE 'Clickstream'[Events with No Step] =
+    CALCULATE(
+        COUNTROWS('Clickstream'),
+        'Clickstream'[EventStep] = BLANK()
+    )
+
+MEASURE 'Clickstream'[Abandoned Sessions] =
+CALCULATE(
+    DISTINCTCOUNT(Clickstream[SessionID]),
+    Clickstream[Purchased] = 0
+)
+
+MEASURE 'Clickstream'[Dropoff Rate] =
+DIVIDE([Abandoned Sessions], [Sessions])
+
+EVALUATE
+SUMMARIZECOLUMNS(
+    'Clickstream'[DeviceType],
+    'Clickstream'[TrafficSource],
+
+    "Sessions", [Sessions],
+    "Users", [Users],
+    "Events", [Events],
+
+    "Homepage Sessions", [Homepage Sessions],
+    "Product Page Sessions", [Product Page Sessions],
+    "Add To Cart Sessions", [Add To Cart Sessions],
+    "Checkout Start Sessions", [Checkout Start Sessions],
+    "Purchase Sessions", [Purchase Sessions],
+
+    "Conversion Rate %", [Conversion Rate %],
+    "Product → Cart Conversion %", [Product → Cart Conversion %],
+    "Cart → Checkout Conversion %", [Cart → Checkout Conversion %],
+    "Checkout → Purchase Conversion %", [Checkout → Purchase Conversion %],
+    "Dropoff Cart → Checkout %", [Dropoff Cart → Checkout %],
+    "Cart Abandonment Rate %", [Cart Abandonment Rate %],
+
+    "Orders", [Orders],
+    "Total Revenue", [Total Revenue],
+    "AOV", [AOV],
+
+    "Conversion Rate by Traffic Source", [Conversion Rate by Traffic Source],
+    "Revenue by Traffic Source", [Revenue by Traffic Source],
+    "Conversion Rate by Device", [Conversion Rate by Device],
+    "Conversion Rate by Browser", [Conversion Rate by Browser],
+
+    "Avg Events per Session", [Avg Events per Session],
+    "Avg Price Viewed", [Avg Price Viewed],
+    "Sessions Abandoned (No Purchase)", [Sessions Abandoned (No Purchase)],
+    "Sessions Missing UserID", [Sessions Missing UserID]
+)
